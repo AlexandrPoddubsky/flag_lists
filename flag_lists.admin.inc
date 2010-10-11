@@ -45,12 +45,12 @@ function theme_flag_lists_admin_page() {
       $ops = theme('flag_lists_ops', $flag);
 
       $name = db_result(db_query("SELECT name from {users} WHERE uid = %d", $flag->uid));
-      $user = l($name, 'user/'. $flag->uid, array('attributes' => array('title' => t('View user profile.'))));
+      $owner = l($name, 'user/'. $flag->uid, array('attributes' => array('title' => t('View user profile.'))));
       $rows[] = array(
         $flag->name,
         $flag->title,
         $flag->content_type,
-        $user,
+        $owner,
         $flag->types ? implode(', ', $flag->types) : '-',
         $ops,
       );
@@ -72,7 +72,7 @@ function flag_lists_add($type = NULL) {
   if (is_null($type)) {
     drupal_access_denied();
   }
-  
+
   return drupal_get_form('flag_lists_form', NULL, $type);
 }
 
@@ -154,7 +154,11 @@ function flag_lists_form_validate($form, $form_state) {
 /**
  * Save a list.
  */
-function flag_lists_form_submit($form, $form_state) {
+function flag_lists_form_submit($form, $form_state, $account = NULL) {
+  if (!isset($account)) {
+    $account = $GLOBALS['user'];
+  }
+
   if ($form_state['values']['edit']) {
     // Editing the title.
     $flag = flag_lists_get_flag($form_state['values']['name']);
@@ -164,10 +168,7 @@ function flag_lists_form_submit($form, $form_state) {
     _flag_lists_clear_cache();
   }
   else {
-    // New flag.
-    global $user;
-
-    // Load the template row.
+    // New flag. Load the template row.
     $type = $form_state['values']['type'];
     $row = db_fetch_object(db_query("SELECT * from {flags} f LEFT JOIN {flag_lists_types} fl on f.name = fl.name WHERE fl.type = '%s'", $type));
 
@@ -183,10 +184,10 @@ function flag_lists_form_submit($form, $form_state) {
     $flag->link_type = 'toggle';
     $flag->title = $form_state['values']['title'];;
     $flag->types = array($type);
-    $flag->uid = $user->uid;
+    $flag->uid = $account->uid;
     flag_lists_set_messages($flag);
     // Save it.
-    flag_lists_save($flag);
+    flag_lists_save($flag, $account);
   }
 }
 
@@ -327,4 +328,173 @@ function flag_lists_create_template_form_submit($form, &$form_state) {
   // Enter the new template into flag_lists_types.
   db_query("INSERT INTO {flag_lists_types} (name) VALUES ('%s')", $flag->name);
   $form_state['redirect'] = 'admin/build/flags/edit/'. $flag->name;
+}
+
+
+
+/**
+ * Developer tool to generate dummy lists and listings.
+ */
+
+// @todo use batch api.
+function flag_lists_generate_lists_form() {
+  $templates = flag_lists_get_templates();
+  $options = array();
+  foreach ($templates as $template) {
+    $options[$template->fid] = $template->name . ' ('. implode(', ', $template->types) .')';
+  }
+  $form['templates'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Generate lists and/or listings for the following templates.'),
+    '#options' => $options,
+  );
+
+  $form['lists'] = array(
+    '#type' => 'textfield',
+    '#title' => t('How many lists should be generated?'),
+    '#default_value' => '0',
+    '#size' => 7,
+    '#maxlength' => 7,
+  );
+
+  $form['listings'] = array(
+    '#type' => 'textfield',
+    '#title' => t('How many listings should be generated?'),
+    '#default_value' => '0',
+  );
+
+  $form['kill_lists'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Delete ALL existing lists and listings before generating new ones? Templates will not be deleted.'),
+    '#default_value' => FALSE,
+  );
+  $form['kill_listings'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Delete ALL existing listings before generating new ones? (Lists are not deleted unless the above is checked.)'),
+    '#default_value' => FALSE,
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Do it!'),
+  );
+  return $form;
+}
+
+/**
+ * Validation handler for flag_lists_generate_lists_form.
+ */
+function flag_lists_generate_lists_form_validate($form, &$form_state) {
+  if ($form_state['values']['lists'] && !is_numeric($form_state['values']['lists']) || $form_state['values']['lists'] < 0) {
+    form_set_error('lists', t('Number of lists to generate must be a number, 1 or more.'));
+  }
+  if ($form_state['values']['listings'] && !is_numeric($form_state['values']['listings']) || $form_state['values']['listings'] < 0) {
+    form_set_error('listings', t('Number of listings to generate must be a number, 1 or more.'));
+  }
+  if ($form_state['values']['lists'] > 0 && !count(array_filter($form_state['values']['templates']))) {
+    form_set_error('templates', t('You must select at least 1 template for the lists to be genereated'));
+  }
+  if ($form_state['values']['listings'] > 0 && !count(array_filter($form_state['values']['templates']))) {
+    form_set_error('templates', t('You must select at least 1 template for the listings to be genereated'));
+  }
+}
+
+/**
+ * Submit handler for flag_lists_generate_lists_form.
+ */
+function flag_lists_generate_lists_form_submit($form, &$form_state) {
+  global $user;
+  module_load_include('inc', 'devel_generate');
+
+  // Delete listings.
+  if ($form_state['values']['kill_listings']) {
+      $flags = flag_lists_get_flags();
+    foreach ($flags as $flag) {
+      $result = db_query("SELECT fcid, content_id from {flag_lists_content} WHERE fid = %d", $flag->fid);
+      while ($row = db_fetch_array($result)) {
+        db_query("DELETE FROM {flag_lists_content} WHERE fid = %d", $flag->fid);
+        db_query("DELETE FROM {flag_lists_counts} WHERE fid = %d", $flag->fid);
+        module_invoke_all('flag', 'unflag', $flag, $row['content_id'], $account, $row['fcid']);
+      }
+    }
+    drupal_set_message(t('All listings were deleted.'));
+  }
+
+  // Delete lists and listings.
+  if ($form_state['values']['kill_lists']) {
+    // If we loaded all flags above, don't reload them here.
+    if (!count($flags)) {
+      $flags = flag_lists_get_flags();
+    }
+    foreach ($flags as $flag) {
+      flag_lists_fl_delete($flag, $user);
+    }
+    drupal_set_message(t('All lists and their listings were deleted.'));
+  }
+
+
+  $templates = array_filter($form_state['values']['templates']);
+  $uids = array_filter(devel_get_users()); // Don't use the anon user.
+
+  // Generate lists.
+  if ($form_state['values']['lists'] && count($templates)) {
+    for ($i = 1; $i <= $form_state['values']['lists']; $i++ ) {
+      $template = flag_get_flag(NULL, array_rand($templates));
+      $account->uid = $uids[array_rand($uids)];
+      $edit['values']['title'] = devel_create_greeking(7, TRUE);
+      $edit['values']['type'] = $template->types[array_rand($template->types)];
+      $form = array();
+      flag_lists_form_submit($form, $edit, $account);
+    }
+  drupal_set_message(t('@lists created.', array('@lists' => format_plural($form_state['values']['lists'], '1 list', '@count lists'))));
+  }
+
+  // Generate listings.
+  if ($form_state['values']['listings']) {
+
+    $count = 0;
+
+    for ($i = 1; $i <= $form_state['values']['listings']; $i++ ) {
+      $account->uid = $uids[array_rand($uids)];
+      $lists = flag_lists_get_user_flags(NULL, $account);
+
+      // Remove any lists that don't use the chosen templates.
+      foreach ($lists as $key => $list) {
+       if (!isset($templates[$list->pfid])) {
+        unset($lists[$key]);
+        }
+      }
+
+      // Ensure user has lists.
+      if (!count($lists)) {
+        continue;
+      }
+
+      $list = $lists[array_rand($lists)];
+      $content_type = $list->types[array_rand($list->types)];
+
+      // We get the random nid with 2 SELECTS to avoid slow ORDER BY Rand().
+      // Get max nid for our content type.
+      $max_nid = db_result(db_query("SELECT MAX(nid) as max FROM {node} WHERE type = '%s'", $content_type));
+
+      // Ensure a node exists for the type.
+      if (!$max_nid) {
+        continue;
+      }
+
+      $r = rand(1, $max_nid);
+      $content_id = db_result(db_query("SELECT nid from {node} WHERE type = '%s' AND nid >= %d LIMIT 1", $content_type, $r));
+
+      // We can't assume that every attempt will result in a listing because
+      // we may have a node type with no nodes yet or a user with no lists.
+      // Also, if a listing already exists, we count it, but it can only be in
+      // the db once.
+      if (flag_lists_do_flag($list, 'flag', $content_id, $account, TRUE)){
+        $count++;
+      }
+    }
+  drupal_set_message(t('@listings listed.', array('@listings' => format_plural($count, '1 node', '@count nodes'))));
+  if ($count < $form_state['values']['listings']) {
+    drupal_set_message(t('Listings are generated randomly. Occassionally a listing will not be created if the random user has no lists or if the node type to be listed has no nodes.'));
+  }
+  }
 }

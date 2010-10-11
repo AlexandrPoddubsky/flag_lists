@@ -9,7 +9,7 @@ class flag_lists_handler_filter_template extends views_handler_filter_in_operato
       $this->value_title = t('List templates');
       $templates = flag_lists_get_templates();
       foreach ($templates as $template) {
-        $options[$template] = $template;
+        $options[$template->name] = $template->name;
       }
       $this->value_options = $options;
     }
