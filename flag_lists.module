@@ -147,14 +147,11 @@ function theme_flag_lists_user_page($uid) {
   if ($flags = flag_lists_get_user_flags(NULL, $account)) {
     // Build the list of flag lists for this node.
     foreach ($flags as $flag) {
-      $ops = theme('links', array(
-        'flags_edit' =>  array( 'title' => t('edit'), 'href' => 'flags/lists/edit/'. $flag->name, 'query' => drupal_get_destination()),
-        'flags_delete' =>  array( 'title' => t('delete'), 'href' => 'flags/lists/delete/'. $flag->name, 'query' => drupal_get_destination()),
-      ));
+      $ops = theme('flag_lists_ops', $flag);
       $items[] = l($flag->title, "user/$uid/flags/lists/". $flag->fid) . $ops;
     }
   }
-  #$items[] = l(t('Make a new ') . variable_get('flag_lists_name', t('Flag')), 'admin/build/flags/lists/add/'. $content_type, array('query' => drupal_get_destination()));
+  //$items[] = l(t('Make a new ') . variable_get('flag_lists_name', t('Flag')), 'admin/build/flags/lists/add/'. $content_type, array('query' => drupal_get_destination()));
   drupal_add_css(drupal_get_path('module', 'flag_lists') .'/theme/flag_lists.css');
   return theme(item_list, $items);
 }
@@ -229,13 +226,6 @@ function flag_lists_form_alter(&$form, $form_state, $form_id) {
         $form['name']['#type'] = 'value';
         $form['global']['#type'] = 'value';
         $form['title']['#description'] = t('A short, descriptive title for this template. It will be used in administrative interfaces to refer to this template.');
-
-        foreach (element_children($form['messages']) as $message) {
-          if ($form['messages'][$message]['#type'] == 'textfield') {
-            $form['messages'][$message]['#title'] .= t(' prefix');
-            $form['messages'][$message]['#description'] = $form['messages'][$message]['#description'] . t(' Enter a prefix here. The user-created list name and the admin-chosen list terminology will be appended.');
-          }
-        }
 
         foreach (element_children($form['display']) as $display) {
           $form['display'][$display]['#type'] = 'value';
@@ -391,12 +381,12 @@ function flag_lists_set_messages(&$flag) {
   $pflag = flag_get_flag(NULL, $flag->pfid);
   $title = $flag->title;
   $lists_name = variable_get('flag_lists_name', t('list'));
-  $flag->flag_short      = $pflag->flag_short .' '. $title .' '. $lists_name;
-  $flag->flag_long       = $pflag->flag_long .' '. $title .' '. $lists_name;
-  $flag->flag_message    = $pflag->flag_message .' '. $title .' '. $lists_name;
-  $flag->unflag_short    = $pflag->unflag_short .' '. $title .' '. $lists_name;
-  $flag->unflag_long     = $pflag->unflag_long .' '. $title .' '. $lists_name;
-  $flag->unflag_message  = $pflag->unflag_message .' '. $title .' '. $lists_name;
+  $flag->flag_short      = $pflag->flag_short;
+  $flag->flag_long       = $pflag->flag_long;
+  $flag->flag_message    = $pflag->flag_message;
+  $flag->unflag_short    = $pflag->unflag_short;
+  $flag->unflag_long     = $pflag->unflag_long;
+  $flag->unflag_message  = $pflag->unflag_message;
 }
 
 /**
@@ -599,7 +589,6 @@ function theme_flag_lists_list($node, $create = TRUE, $ops = TRUE, $use_flags = 
       if ($ops && $flag->module == 'flag_lists') {
         $ops_links = theme('flag_lists_ops', $flag);
       }
-
       $link = $flag->theme($action, $content_id) . $ops_links;
 
       // If it's a list, fix the link.
@@ -734,7 +723,6 @@ function flag_lists_get_flagged_content($fid, $uid) {
  *   An array defining properties of the link.
  */
 function flag_lists_flag_link($flag, $action, $content_id) {
-  $token = flag_get_token($content_id);
   return array();
 }
 
@@ -744,7 +732,7 @@ function flag_lists_flag_link($flag, $action, $content_id) {
 function flag_lists_flag_link_types() {
   return array(
     'fl_template' => array(
-      'title' => t('Flag Lists template'),
+      'title' => t('Flag Lists toggle'),
       'description' => t('If you are creating a Flag lists template flag, you must select this link type. '),
     ),
   );
@@ -773,7 +761,7 @@ function flag_lists_flag_default_flags($name = 'fl_template') {
       'unflag_long' => 'Remove this post from your',
       'unflag_message' => 'This post has been removed from your',
       'types' => array(),
-      'link_type' => 'fl_template',
+      'link_type' => 'toggle',
     ),
   );
 }
@@ -1078,4 +1066,42 @@ function flag_lists_get_templates() {
     $templates[] = flag_get_flag($row['name']);
   }
   return $templates;
+}
+
+
+/**
+ * Implementation of hook_token_list().
+ */
+function flag_lists_token_list($type = 'all') {
+  $tokens = array();
+  if ($type == 'node' || $type == 'all') {
+    $tokens['flag_lists']['flag-lists-term'] = t('The terminology used to name the lists, such as list, wishlist, favorites, etc.');
+    $tokens['flag_lists']['flag-lists-title'] = t('The title of the lis.');
+  }
+  return $tokens;
+}
+
+/**
+ * Implementation of hook_token_values().
+ */
+function flag_lists_token_values($type, $object = NULL) {
+  $values = array();
+  if ($type == 'flag_lists') {
+    $values['flag-lists-term'] = check_plain(variable_get('flag_lists_name', t('list')));
+    $values['flag-lists-title'] = check_plain($object->title);
+  }
+  return $values;
+}
+
+
+/**
+ * Preprocess link title and text for the flag.tpl.php
+ *
+ * This seems to be the only place to do this
+ */
+function flag_lists_preprocess_flag(&$variables) {
+  if (module_exists('token') && $variables['flag']->module == 'flag_lists') {
+    $variables['link_text'] = token_replace($variables['link_text'], 'flag_lists', $variables['flag']);
+    $variables['link_title'] = token_replace($variables['link_title'], 'flag_lists', $variables['flag']);
+  }
 }

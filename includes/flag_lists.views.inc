@@ -39,6 +39,10 @@ function flag_lists_views_handlers() {
         'parent' => 'views_handler_filter_in_operator',
         'file' => 'flag_lists_handler_filter_template.inc',
       ),
+      'flag_lists_handler_argument_fid' => array(
+        'parent' => 'views_handler_argument_numeric',
+        'file' => 'flag_lists_handler_argument_fid.inc',
+    ),
     ),
   );
 }
@@ -139,7 +143,7 @@ function flag_lists_views_data() {
         'allow empty' => TRUE,
       ),
       'argument' => array(
-        'handler' => 'views_handler_argument_numeric',
+        'handler' => 'flag_lists_handler_argument_fid',
       ),
       'sort' => array(
         'handler' => 'views_handler_sort',

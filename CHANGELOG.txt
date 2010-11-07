@@ -1,3 +1,7 @@
+Flag lists (Nov. 07, 2010)
+
+Add token support including list terminology and title.
+Added argument handler for fid. Uses list title for display instead fid.
 
 Flag lists (Oct. 11, 2010)
 =====
