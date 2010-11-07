@@ -221,21 +221,37 @@ function flag_lists_perm() {
 function flag_lists_form_alter(&$form, $form_state, $form_id) {
   switch ($form_id) {
     case 'flag_form':
-      // A template flag should always have a record in the flag_lists_types table.
-      if ($result = db_fetch_array(db_query("SELECT name FROM {flag_lists_types} WHERE name = '%s'", $form['name']['#default_value']))) {
-        $form['name']['#type'] = 'value';
-        $form['global']['#type'] = 'value';
-        $form['title']['#description'] = t('A short, descriptive title for this template. It will be used in administrative interfaces to refer to this template.');
+    // A template flag should always have a record in the flag_lists_types table.
+    $result = db_query("SELECT * FROM {flag_lists_types}");
+    while ($type = db_fetch_array($result)) {
+      $types[$type['name']] = $type['type'];
+    }
+    if (isset($types[$form['name']['#default_value']])) {
+      $form['name']['#type'] = 'value';
+      $form['global']['#type'] = 'value';
+      $form['title']['#description'] = t('A short, descriptive title for this template. It will be used in administrative interfaces to refer to this template.');
 
-        foreach (element_children($form['display']) as $display) {
-          $form['display'][$display]['#type'] = 'value';
+      // Warn about types that already have a template.
+      foreach ($form['access']['types']['#options'] as $option => $value) {
+        if (in_array($option, $types) && $form['access']['types']['#default_value'] != $option) {
+          $form['access']['types']['#options'][$option] .= '<span class="description">'. t(' (Already has a template.) '). '</span>';
         }
-        $form['display']['link_type']['#default_value'] = 'fl_template';
-        $form['display']['#description'] = t('Unlike normal flags, lists are only displayed in a block provided by this module or in views blocks. See <a href="/admin/build/block/list">the block admin page</a> to place the block.');
-
-        $form['#validate'][] = 'flag_lists_template_validate';
-        $form['#submit'][] = 'flag_lists_template_submit';
       }
+      $form['access']['types']['#description'] .= t(' A type may only be selected in one list template.');
+
+      // Unset anon permissions for now. @todo allow anon listing.
+      unset ($form['access']['roles']['flag']['#options'][1]);
+      unset ($form['access']['roles']['unflag']['#options'][1]);
+
+      foreach (element_children($form['display']) as $display) {
+        $form['display'][$display]['#type'] = 'value';
+      }
+      $form['display']['link_type']['#default_value'] = 'fl_template';
+      $form['display']['#description'] = t('Unlike normal flags, lists are only displayed in a block provided by this module or in views blocks. See <a href="/admin/build/block/list">the block admin page</a> to place the block.');
+
+      $form['#validate'][] = 'flag_lists_template_validate';
+      $form['#submit'][] = 'flag_lists_template_submit';
+    }
     break;
   }
 }
@@ -754,12 +770,12 @@ function flag_lists_flag_default_flags($name = 'fl_template') {
       // to the DB in English. They are passed to t() later, thus allowing for
       // multilingual sites.
       'title' => 'Flag lists template',
-      'flag_short' => 'Add to your',
-      'flag_long' => 'Add this post to your',
-      'flag_message' => 'This post has been added to your',
-      'unflag_short' => 'Remove this from your',
-      'unflag_long' => 'Remove this post from your',
-      'unflag_message' => 'This post has been removed from your',
+      'flag_short' => 'Add to your [flag-lists-title] [flag-lists-term]',
+      'flag_long' => 'Add this post to your [flag-lists-title] [flag-lists-term]',
+      'flag_message' => 'This post has been added to your [flag-lists-title] [flag-lists-term]',
+      'unflag_short' => 'Remove this from your [flag-lists-title] [flag-lists-term]',
+      'unflag_long' => 'Remove this post from your [flag-lists-title] [flag-lists-term]',
+      'unflag_message' => 'This post has been removed from your [flag-lists-title] [flag-lists-term]',
       'types' => array(),
       'link_type' => 'toggle',
     ),

@@ -311,7 +311,7 @@ function flag_lists_create_template_form_validate($form, &$form_state) {
     form_set_error('name', t('The flag name may only be 32 characters long.'));
   }
   // Ensure the machine name is unique.
-  $flag = flag_get_flag($form_state['values']['name']);
+  $flag = flag_get_flag('fl_template_'. $form_state['values']['name']);
   if ($flag) {
     form_set_error('name', t('Flag names must be unique. This flag name is already in use.'));
   }

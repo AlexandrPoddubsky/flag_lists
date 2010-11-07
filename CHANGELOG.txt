@@ -1,5 +1,8 @@
 Flag lists (Nov. 07, 2010)
-
+Show which types are in use in template config form.
+Move key from type to name in flag_list_types *NOT creating update for this.
+Fix template naming. Was not saved correctly to flag_lists_types table.
+Change default template messages to anticipate token use.
 Add token support including list terminology and title.
 Added argument handler for fid. Uses list title for display instead fid.
 

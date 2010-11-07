@@ -165,7 +165,7 @@ function flag_lists_schema() {
         'not null' => FALSE,
         'default' => '')
     ),
-    'primary key' => array('type'),
+    'primary key' => array('name'),
     'indexes' => array(
       'name' => array('name'),
     ),
