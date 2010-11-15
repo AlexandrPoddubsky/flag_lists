@@ -121,7 +121,7 @@ function flag_lists_menu() {
     'type' => MENU_LOCAL_TASK,
   );
   $items['user/%/flags/lists/%'] = array(
-    'title' => 'Content in flag list',
+    'title' => 'Listed content',
     'page callback' => 'flag_lists_user_list',
     'page arguments' => array(1, 4),
     'access callback' => 'user_access',
@@ -135,7 +135,20 @@ function flag_lists_menu() {
  * User flag page. Display a list of user-created flag lists.
  */
 function flag_lists_user_page($uid) {
-  return theme('flag_lists_user_page', $uid);
+    // Can we use our default view?
+  if (module_exists('views')) {
+    $view = views_get_view('flag_lists_user_lists', FALSE);
+    if (!empty($view)) {
+      $view->set_display('default');
+      $view->set_arguments(array($uid));
+      $output = $view->render();
+      drupal_set_title($view->build_info['title']);
+    }
+    return $output;
+  }
+  else {
+    return theme('flag_lists_user_page', $uid);
+  }
 }
 
 /**
@@ -151,7 +164,6 @@ function theme_flag_lists_user_page($uid) {
       $items[] = l($flag->title, "user/$uid/flags/lists/". $flag->fid) . $ops;
     }
   }
-  //$items[] = l(t('Make a new ') . variable_get('flag_lists_name', t('Flag')), 'admin/build/flags/lists/add/'. $content_type, array('query' => drupal_get_destination()));
   drupal_add_css(drupal_get_path('module', 'flag_lists') .'/theme/flag_lists.css');
   return theme(item_list, $items);
 }
@@ -160,7 +172,21 @@ function theme_flag_lists_user_page($uid) {
  * List the contents of a user-defined list
  */
 function flag_lists_user_list($uid, $fid) {
+    // Can we use our default view?
+  if (module_exists('views')) {
+    $view = views_get_view('flag_lists_user_list', FALSE);
+    if (!empty($view)) {
+      $view->set_display('default');
+      $view->set_arguments(array($fid));
+      $output = $view->render();
+      drupal_set_title($view->build_info['title']);
+    }
+    return $output;
+  }
+
+  else {
   return theme('flag_lists_user_list', $uid, $fid);
+}
 }
 
 /**

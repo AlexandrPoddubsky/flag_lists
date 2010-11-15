@@ -22,11 +22,10 @@ function theme_flag_lists_admin_page() {
 
   // Can we use our default view?
   if (module_exists('views')) {
-    views_include('view');
-    $view = view::load('flag_lists', FALSE);
-    $default_view = views_get_default_view('flag_lists');
-    if (!empty($view) || !empty($default_view)) {
-      $output .= views_embed_view('flag_lists');
+    $view = views_get_view('flag_lists', FALSE);
+    if (!empty($view)) {
+      $view->set_display('default');
+      $output .= $view->render();
     }
   }
 

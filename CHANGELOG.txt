@@ -1,4 +1,10 @@
 Flag lists (Nov. 07, 2010)
+=====
+Update view flags_lists_user_lists
+Add view flag_lists_user_list
+Use views when enabled.
+
+Flag lists (Nov. 07, 2010)
 Show which types are in use in template config form.
 Move key from type to name in flag_list_types *NOT creating update for this.
 Fix template naming. Was not saved correctly to flag_lists_types table.
