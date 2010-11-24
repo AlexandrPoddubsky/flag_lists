@@ -223,13 +223,13 @@ function flag_lists_theme() {
       'arguments' => array('flags' => NULL),
     ),
     'flag_lists_user_page' => array(
-      'argumnts' => array('uid' => NULL),
+      'arguments' => array('uid' => NULL),
     ),
     'flag_lists_user_list' => array(
-      'argumnts' => array('flag_name' => NULL),
+      'arguments' => array('flag_name' => NULL),
     ),
     'flag_lists_ops' => array(
-      'argumnts' => array('flag' => NULL),
+      'arguments' => array('flag' => NULL),
     )
   );
 }
@@ -283,7 +283,7 @@ function flag_lists_form_alter(&$form, $form_state, $form_id) {
 }
 
 function flag_lists_template_validate($form, &$form_state) {
-  $types = array_unique($form_state['values']['types']);
+  $types = array_filter($form_state['values']['types']);
   $errors = array();
   foreach ($types as $type) {
     if ($result = db_query("SELECT * FROM {flag_lists_types} WHERE type = '%s' AND name <> '%s'", $type, $form_state['values']['name'])) {
@@ -301,7 +301,7 @@ function flag_lists_template_validate($form, &$form_state) {
 }
 
 function flag_lists_template_submit($form, &$form_state) {
-  $types = array_unique($form_state['values']['types']);
+  $types = array_filter($form_state['values']['types']);
   // Clean out the old types, then add the new.
   db_query("DELETE FROM {flag_lists_types} WHERE name = '%s'", $form_state['values']['name']);
   foreach ($types as $type) {
@@ -544,7 +544,6 @@ function flag_lists_get_user_flags($content_type = NULL, $account = NULL, $use_f
   if ($content_type) {
     $sql .= " AND ft.type = '%s'";
   }
-  $sql .= " GROUP BY fl.fid, ft.type";
   $result = db_query($sql, $account->uid, $content_type);
   while ($row = db_fetch_object($result)) {
     if (!isset($lists[$row->name])) {
@@ -630,8 +629,11 @@ function theme_flag_lists_list($node, $create = TRUE, $ops = TRUE, $use_flags = 
       // Do we need the ops?
       if ($ops && $flag->module == 'flag_lists') {
         $ops_links = theme('flag_lists_ops', $flag);
+        $link = $flag->theme($action, $content_id) . $ops_links;
       }
-      $link = $flag->theme($action, $content_id) . $ops_links;
+      else {
+        $link = $flag->theme($action, $content_id);
+      }
 
       // If it's a list, fix the link.
       if ($flag->module == 'flag_lists') {
@@ -650,7 +652,7 @@ function theme_flag_lists_list($node, $create = TRUE, $ops = TRUE, $use_flags = 
   }
 
   drupal_add_css(drupal_get_path('module', 'flag_lists') .'/theme/flag_lists.css');
-  return theme(item_list, $items);
+  return theme(item_list, $items, NULL, 'ul', array('class' => 'flag-lists-links'));
 }
 
 
@@ -842,7 +844,7 @@ function flag_lists_update($flag) {
  */
 function flag_lists_insert($flag) {
   db_query("INSERT INTO {flag_lists_flags} (pfid, uid, content_type, name, title, options) VALUES (%d, %d, '%s', '%s', '%s', '%s')", $flag->pfid, $flag->uid, $flag->content_type, $flag->name, $flag->title, $flag->get_serialized_options($flag));
-  $flag->fid = db_last_insert_id('flags', 'fid');
+  $flag->fid = db_last_insert_id('flag_lists_flags', 'fid');
   $flag->name = 'flag_lists_'. $flag->uid .'_'. $flag->fid;
   flag_lists_update($flag);
 

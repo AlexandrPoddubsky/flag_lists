@@ -1,3 +1,14 @@
+Flag lists (Nov. 24, 2010)
+=====
+Fix bug: Use array_filter instead of array_unique on flag_lists_template_submit()
+  and flag_lists_template_validate();
+Fix bug: Remove GROUP BY in flag_lists_get_user_flags(). Caused postgres bug.
+Fix bug: flag_lists_insert() db_last_insert_id() used wrong table.
+Fix typos in flag_lists_theme().
+Remove flag_lists link ops from regular flag links.
+Add flag-lists-links to item list in theme_flag_lists_list().
+
+
 Flag lists (Nov. 07, 2010)
 =====
 Update view flags_lists_user_lists
