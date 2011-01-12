@@ -1,3 +1,9 @@
+Flag lists (Jan. 12, 2011)
+#1023432 by erikwebb: Fixed No default value for $account in flag_lists_fl_delete().
+#1002294 by architectJpres: Fixed List block incompatible with block caching.
+  Block caching turned off for now. Still not making db updates so you need to
+  remove the block from its region and then put it back to turn on caching.
+
 Flag lists (Nov. 24, 2010)
 =====
 Fix bug: Use array_filter instead of array_unique on flag_lists_template_submit()

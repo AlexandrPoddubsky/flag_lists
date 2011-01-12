@@ -271,7 +271,6 @@ function flag_lists_delete_confirm_submit($form, &$form_state) {
   $flag = flag_lists_get_flag($form_state['values']['fid']);
   if ($form_state['values']['confirm']) {
     flag_lists_fl_delete($flag);
-    _flag_lists_clear_cache();
   }
 }
 
