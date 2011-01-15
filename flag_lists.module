@@ -1148,5 +1148,6 @@ function flag_lists_preprocess_flag(&$variables) {
   if (module_exists('token') && $variables['flag']->module == 'flag_lists') {
     $variables['link_text'] = token_replace($variables['link_text'], 'flag_lists', $variables['flag']);
     $variables['link_title'] = token_replace($variables['link_title'], 'flag_lists', $variables['flag']);
+    $variables['message_text'] = token_replace($variables['message_text'], 'flag_lists', $variables['flag']);
   }
 }

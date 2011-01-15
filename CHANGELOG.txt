@@ -1,3 +1,8 @@
+// $id: $
+
+Flag lists (Jan. 14, 2001
+#1002292 Fixed Tokens not replaced in add-to-list and remove-from-list js messages.
+
 Flag lists (Jan. 12, 2011)
 #1023432 by erikwebb: Fixed No default value for $account in flag_lists_fl_delete().
 #1002294 by architectJpres: Fixed List block incompatible with block caching.
