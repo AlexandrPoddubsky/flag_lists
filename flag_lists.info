@@ -3,4 +3,5 @@ name = Flag lists
 core = 6.x
 package = Flags
 dependencies[] = flag
+dependencies[] = token
 description = Allows users to create personal flag lists.
