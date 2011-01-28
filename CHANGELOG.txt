@@ -1,6 +1,10 @@
 // $id: $
 
-Flag lists (Jan. 14, 2001
+Flag lists (Jan. 27, 2011
+Fix bug: Incorrectly checking status of non-flag_lists flags.
+Fix bug: Incorrectly applying hook_flag_access() on non-flag_lists flags.
+
+Flag lists (Jan. 14, 2011
 #1002292 Fixed Tokens not replaced in add-to-list and remove-from-list js messages.
 #1002292 Token module now a required dependency.
 

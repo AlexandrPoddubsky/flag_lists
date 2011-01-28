@@ -438,6 +438,7 @@ function flag_lists_set_messages(&$flag) {
  * Make sure a user can only see his/her own personal flags.
  */
 function flag_lists_flag_access($flag, $content_id, $action, $account) {
+  if ($flag->module == 'flag_lists') {
   switch ($action) {
     case 'flag':
     case 'unflag':
@@ -448,6 +449,7 @@ function flag_lists_flag_access($flag, $content_id, $action, $account) {
         return array('flag_lists' => FALSE);
       }
   }
+}
 }
 
 /**
@@ -625,7 +627,12 @@ function theme_flag_lists_list($node, $create = TRUE, $ops = TRUE, $use_flags = 
 
     // Build the list of lists for this node.
     foreach ($flags as $flag) {
+      if ($flag->module == 'flag_lists') {
       $action = _flag_lists_is_flagged($flag, $content_id, $user->uid, 0) ? 'unflag' : 'flag';
+      }
+      else {
+        $action = $flag->is_flagged($content_id) ? 'unflag' : 'flag';;
+      }
 
       // Do we need the ops?
       if ($ops && $flag->module == 'flag_lists') {
