@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 module_load_include('inc', 'flag', 'includes/flag.admin');
 module_load_include('inc', 'flag', 'flag');
