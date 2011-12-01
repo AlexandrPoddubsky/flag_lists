@@ -1,5 +1,6 @@
 <?php
 /**
+ * @file flag_lists_handler_field_template_types.inc
  * Field handler to provide a list of template node types.
  */
 class flag_lists_handler_field_template_types extends views_handler_field_prerender_list {

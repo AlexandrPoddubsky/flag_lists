@@ -314,4 +314,3 @@ function flag_lists_views_data() {
   );
   return $data;
 }
-?>

@@ -176,7 +176,6 @@ function flag_lists_schema() {
  * Implementation of hook_install().
  */
 function flag_lists_install() {
-  drupal_install_schema('flag_lists');
   // Set up our default template.
   db_query("INSERT INTO {flag_lists_types} (name) VALUES ('fl_template')");
 
@@ -195,7 +194,6 @@ function flag_lists_uninstall() {
       }
     }
   }
-  drupal_uninstall_schema('flag_lists');
   db_query("DELETE FROM {variable} WHERE name LIKE 'flag_lists%'");
   drupal_set_message(t('Flag lists has been uninstalled.'));
 }

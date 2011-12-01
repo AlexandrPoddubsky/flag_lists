@@ -1,5 +1,6 @@
 <?php
 /**
+ * @file flag_lists_handler_filter_template.inc
  * Filter by list template
  */
 class flag_lists_handler_filter_template extends views_handler_filter_in_operator {

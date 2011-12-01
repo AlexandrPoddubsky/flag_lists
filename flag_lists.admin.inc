@@ -43,7 +43,7 @@ function theme_flag_lists_admin_page() {
       $ops = theme('flag_lists_ops', $flag);
 
       $name = db_result(db_query("SELECT name from {users} WHERE uid = %d", $flag->uid));
-      $owner = l($name, 'user/'. $flag->uid, array('attributes' => array('title' => t('View user profile.'))));
+      $owner = l($name, 'user/' . $flag->uid, array('attributes' => array('title' => t('View user profile.'))));
       $rows[] = array(
         $flag->name,
         $flag->title,
@@ -88,7 +88,11 @@ function flag_lists_form(&$form_state, $name = NULL, $type = NULL) {
   }
   // If name is numeric, then we have the fid, so get the name.
   if (is_numeric($name)) {
-    $name = db_result(db_query("SELECT name from {flag_lists_flags} WHERE fid = %s", $name));
+    $name = db_select('flag_lists_flags', 'f')
+      ->fields('f', 'name')
+      ->condition('fid', $name)
+      ->execute()
+      ->fetchField();
   }
   // Adding a new list.
   if (!isset($name)) {
@@ -102,7 +106,11 @@ function flag_lists_form(&$form_state, $name = NULL, $type = NULL) {
   // Editing an existing list.
   else {
     $flag = flag_lists_get_flag($name);
-    drupal_set_title(t('Edit your "@title" @name title', array('@title' => $flag->get_title(), '@name' => variable_get('flag_lists_name', t('list')))));
+
+    $title_string_name = variable_get('flag_lists_name', 'list');
+    $title_string = t('Edit your "@title" @name title', array('@title' => $flag->get_title(), '@name' => $title_string_name));
+    drupal_set_title();
+    
     $form['edit'] = array(
       '#type' => 'hidden',
       '#value' => TRUE,
@@ -193,7 +201,7 @@ function flag_lists_form_submit($form, $form_state, $account = NULL) {
  * Flag lists settings page.
  */
 function flag_lists_settings_form(&$form_state) {
-  drupal_set_title('Flag lists settings');
+  drupal_set_title(t('Flag lists settings'));
   $form['text'] = array(
     '#title' => t('Using flag lists'),
     '#value' => t('Flag lists allow users to create their own personal flags.
@@ -220,7 +228,7 @@ function flag_lists_settings_form(&$form_state) {
     '#tree' => FALSE,
   );
   $form['rebuild']['global_rebuild'] = array(
-    '#value' => l('Rebuild all flag lists.', 'admin/build/flag_lists/rebuild'),
+    '#value' => l(t('Rebuild all flag lists.'), 'admin/build/flag_lists/rebuild'),
   );
 
   return system_settings_form($form);
@@ -308,7 +316,7 @@ function flag_lists_create_template_form_validate($form, &$form_state) {
     form_set_error('name', t('The flag name may only be 32 characters long.'));
   }
   // Ensure the machine name is unique.
-  $flag = flag_get_flag('fl_template_'. $form_state['values']['name']);
+  $flag = flag_get_flag('fl_template_' . $form_state['values']['name']);
   if ($flag) {
     form_set_error('name', t('Flag names must be unique. This flag name is already in use.'));
   }
@@ -318,13 +326,13 @@ function flag_lists_create_template_form_validate($form, &$form_state) {
  * New template submit.
  */
 function flag_lists_create_template_form_submit($form, &$form_state) {
-  $template = flag_lists_flag_default_flags('fl_template_'. $form_state['values']['name']);
+  $template = flag_lists_flag_default_flags('fl_template_' . $form_state['values']['name']);
   $flag = flag_flag::factory_by_array($template[0]);
-  $flag->title = t('List template '). $form_state['values']['name'];
+  $flag->title = t('List template') . ' ' . $form_state['values']['name'];
   $flag->save();
   // Enter the new template into flag_lists_types.
   db_query("INSERT INTO {flag_lists_types} (name) VALUES ('%s')", $flag->name);
-  $form_state['redirect'] = 'admin/build/flags/edit/'. $flag->name;
+  $form_state['redirect'] = 'admin/build/flags/edit/' . $flag->name;
 }
 
 
@@ -338,7 +346,7 @@ function flag_lists_generate_lists_form() {
   $templates = flag_lists_get_templates();
   $options = array();
   foreach ($templates as $template) {
-    $options[$template->fid] = $template->name . ' ('. implode(', ', $template->types) .')';
+    $options[$template->fid] = $template->name . ' (' . implode(', ', $template->types) . ')';
   }
   $form['templates'] = array(
     '#type' => 'checkboxes',
@@ -479,13 +487,19 @@ function flag_lists_generate_lists_form_submit($form, &$form_state) {
       }
 
       $r = rand(1, $max_nid);
-      $content_id = db_result(db_query("SELECT nid from {node} WHERE type = '%s' AND nid >= %d LIMIT 1", $content_type, $r));
+      $content_id = db_select('node', 'n')
+        ->fields('n', array('nid'))
+        ->condition('type', $content_type)
+        ->condition('nid', $r)
+        ->range(0, 1)
+        ->execute()
+        ->fetchField();
 
       // We can't assume that every attempt will result in a listing because
       // we may have a node type with no nodes yet or a user with no lists.
       // Also, if a listing already exists, we count it, but it can only be in
       // the db once.
-      if (flag_lists_do_flag($list, 'flag', $content_id, $account, TRUE)){
+      if (flag_lists_do_flag($list, 'flag', $content_id, $account, TRUE)) {
         $count++;
       }
     }

@@ -45,6 +45,6 @@ class flag_lists_handler_field_list_edit extends views_handler_field {
     }
 
     $text = !empty($this->options['text']) ? $this->options['text'] : t('edit');
-    return l($text, "flags/lists/edit/". $fid,  array('query' => drupal_get_destination()));
+    return l($text, "flags/lists/edit/" . $fid,  array('query' => drupal_get_destination()));
   }
 }
