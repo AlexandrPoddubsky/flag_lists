@@ -146,25 +146,27 @@ function flag_lists_user_page($uid) {
     return $output;
   }
   else {
-    return theme('flag_lists_user_page', $uid);
+    return theme('flag_lists_user_page', array('uid' => $uid));
   }
 }
 
 /**
  * Theme the output for a user flag administration page.
  */
-function theme_flag_lists_user_page($uid) {
+function theme_flag_lists_user_page($variables) {
+  $uid = variables('uid');
+
   $account = user_load($uid);
   drupal_set_title(t('Lists'));
   if ($flags = flag_lists_get_user_flags(NULL, $account)) {
     // Build the list of flag lists for this node.
     foreach ($flags as $flag) {
-      $ops = theme('flag_lists_ops', $flag);
+      $ops = theme('flag_lists_ops', array('flag' => $flag));
       $items[] = l($flag->title, "user/$uid/flags/lists/" . $flag->fid) . $ops;
     }
   }
   drupal_add_css(drupal_get_path('module', 'flag_lists') . '/theme/flag_lists.css');
-  return theme(item_list, $items);
+  return theme('item_list', array('items' => $items));
 }
 
 /**
@@ -184,14 +186,17 @@ function flag_lists_user_list($uid, $fid) {
   }
 
   else {
-  return theme('flag_lists_user_list', $uid, $fid);
+  return theme('flag_lists_user_list', array('uid' => $uid, 'fid' => $fid));
 }
 }
 
 /**
  * Theme the output of user-defined list page
  */
-function theme_flag_lists_user_list($uid, $fid) {
+function theme_flag_lists_user_list($variables) {
+  $uid = $variables['uid'];
+  $fid = $variables['fid'];
+
   $flag = flag_lists_get_flag($fid);
   drupal_set_title($flag->title);
   $content = flag_lists_get_flagged_content($fid, $uid);
@@ -205,7 +210,7 @@ function theme_flag_lists_user_list($uid, $fid) {
   $breadcrumb = menu_get_active_breadcrumb();
   $breadcrumb[] = l(t('@name lists', array('@name' => drupal_ucfirst(variable_get('flag_lists_name', t('lists'))))), 'user/' . arg(1) . '/flags/lists');
   drupal_set_breadcrumb($breadcrumb);
-  return theme('item_list', $items);
+  return theme('item_list', array('items' => $items));
 }
 
 /**
@@ -216,7 +221,7 @@ function flag_lists_theme() {
 
   return array(
     'flag_lists_list' => array(
-      'variables' => array('content_type' => NULL, 'content_id' => NULL),
+      'variables' => array('node' => NULL, 'create' => NULL, 'ops' => NULL, 'use_flags' => NULL),
     ),
     'flag_lists_admin_page' => array(
       'variables' => array('flags' => NULL),
@@ -461,7 +466,7 @@ function flag_lists_block_view() {
       if (user_access('create flag lists')) {
         $block = array(
           'subject' => t('My lists'),
-          'content' => theme('flag_lists_list', $node, variable_get('flag_lists_create_lists', 0), variable_get('flag_lists_ops', 0), variable_get('flag_lists_include_flags', 0)),
+          'content' => theme('flag_lists_list', array('node' => $node, 'create' => variable_get('flag_lists_create_lists', 0), 'ops' =>variable_get('flag_lists_ops', 0), 'use_flags' => variable_get('flag_lists_include_flags', 0)),
         );
       }
       break;
@@ -669,7 +674,7 @@ function theme_flag_lists_ops($variables) {
     'flags_edit' =>  array('title' => t('edit'), 'href' => 'flags/lists/edit/' . $flag->name, 'query' => drupal_get_destination()),
     'flags_delete' =>  array('title' => t('delete'), 'href' => 'flags/lists/delete/' . $flag->name, 'query' => drupal_get_destination()),
   );
-  return theme('links', $links, NULL, 'ul', array('class' => 'flag_lists_ops'));
+  return theme('links', array('links' => $links, 'attributes' => array('class' => 'flag_lists_ops')));
 }
 
 /**
@@ -687,7 +692,12 @@ function theme_flag_lists_ops($variables) {
  */
 
 // @todo Separate out the code from the theming better.
-function theme_flag_lists_list($node, $create = TRUE, $ops = TRUE, $use_flags = FALSE) {
+function theme_flag_lists_list($variables) {
+  $node = $variables['node'];
+  $create = $variables['create'];
+  $ops = $variables['ops'];
+  $use_flags = $variables['use_flags'];
+
   // Make sure we have a node.
   if (is_object($node) && user_access('create flag lists')) {
     $content_type = $node->type;
