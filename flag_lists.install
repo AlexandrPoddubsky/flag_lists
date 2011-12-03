@@ -164,7 +164,7 @@ function flag_lists_schema() {
         'not null' => FALSE,
         'default' => '')
     ),
-    'primary key' => array('name'),
+    'primary key' => array('name', 'type'),
     'indexes' => array(
       'name' => array('name'),
     ),
@@ -177,23 +177,30 @@ function flag_lists_schema() {
  */
 function flag_lists_install() {
   // Set up our default template.
-  db_query("INSERT INTO {flag_lists_types} (name) VALUES ('fl_template')");
+  db_insert('flag_lists_types')
+    ->fields(array(
+      'name' => 'fl_template',
+    ))
+    ->execute();
 
 }
 
 function flag_lists_uninstall() {
   // Remove our template flags.
   if (module_exists(flag)) {
-    $names = db_fetch_array(db_query("SELECT DISTINCT fid from {flag_lists_types} fl LEFT JOIN {flags} f on fl.name = f.name"));
-    if (count($fids)) {
-      foreach ($fids as $fid) {
-        db_query('DELETE FROM {flags} WHERE fid = %d', $this->fid);
-        db_query('DELETE FROM {flag_content} WHERE fid = %d', $this->fid);
-        db_query('DELETE FROM {flag_types} WHERE fid = %d', $this->fid);
-        db_query('DELETE FROM {flag_counts} WHERE fid = %d', $this->fid);
-      }
+    $query = db_select('flag_lists_types', 'fl')
+      ->leftJoin('flags', 'f', 'fl.name = f.name')
+      ->distinct();
+    $query->addField('fl', 'fid', 'fid');
+    $fids = $query->execute();
+
+    foreach ($fids as $fid) {
+      db_delete('flags')->condition('fid', $fid->fid);
+      db_delete('flag_content')->condition('fid', $fid->fid);
+      db_delete('flag_types')->condition('fid', $fid->fid);
+      db_delete('flag_counts')->condition('fid', $fid->fid);
     }
   }
-  db_query("DELETE FROM {variable} WHERE name LIKE 'flag_lists%'");
+  db_delete('variable')->condition('name', 'flag_lists%', 'LIKE');
   drupal_set_message(t('Flag lists has been uninstalled.'));
 }

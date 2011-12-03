@@ -9,13 +9,15 @@
  * Flag administration page. Display a list of existing flags.
  */
 function flag_lists_admin_page() {
-  return theme('flag_lists_admin_page');
+  return theme('flag_lists_admin_page', array('flag' => NULL));
 }
 
 /**
  * Theme the output for the main flag administration page.
  */
-function theme_flag_lists_admin_page() {
+function theme_flag_lists_admin_page($variables) {
+  $flag = $variables['flag'];
+
   drupal_set_title(t('Flag lists'));
   $output = '<p>' . t('This page shows all the <em>lists</em> that are currently defined on this system.') . '</p>';
 
@@ -42,7 +44,11 @@ function theme_flag_lists_admin_page() {
     foreach ($flags as $flag) {
       $ops = theme('flag_lists_ops', $flag);
 
-      $name = db_result(db_query("SELECT name from {users} WHERE uid = %d", $flag->uid));
+      $name = db_select('users', 'u')
+        ->fields('u', 'name')
+        ->condition('uid', $flag->uid)
+        ->execute()
+        ->fetchField();
       $owner = l($name, 'user/' . $flag->uid, array('attributes' => array('title' => t('View user profile.'))));
       $rows[] = array(
         $flag->name,
@@ -77,7 +83,7 @@ function flag_lists_add($type = NULL) {
 /**
  * Form to Add or edit a list.
  */
-function flag_lists_form(&$form_state, $name = NULL, $type = NULL) {
+function flag_lists_form($form, $form_state, $name = NULL, $type = NULL) {
   // First some sanity checks. $name and $type can't both be NULL.
   // There must be a template for this content type.
   if (is_null($name) && is_null($type)) {
@@ -120,10 +126,11 @@ function flag_lists_form(&$form_state, $name = NULL, $type = NULL) {
       '#value' => $name,
     );
   }
+
   $form['title'] = array(
     '#type' => 'textfield',
     '#title' => t('Title'),
-    '#default_value' => $flag->title,
+    '#default_value' => empty($flag->title) ? '' : $flag->title,
     '#description' => t('A short, descriptive title for this @name list. Limit to 255 characters.', array('@name' => variable_get('flag_lists_name', t('list')))),
     '#maxlength' => 255,
     '#required' => TRUE,
@@ -176,7 +183,14 @@ function flag_lists_form_submit($form, $form_state, $account = NULL) {
   else {
     // New flag. Load the template row.
     $type = $form_state['values']['type'];
-    $row = db_fetch_object(db_query("SELECT * from {flags} f LEFT JOIN {flag_lists_types} fl on f.name = fl.name WHERE fl.type = '%s'", $type));
+    $query = db_select('flags', 'f');
+    $query->leftJoin('flag_lists_types', 'fl', 'f.name = fl.name');
+    $query->fields('f')
+      ->fields('fl')
+      ->condition('fl.type', $type);
+    
+    $row = $query->execute()
+      ->fetchObject();
 
     $newflag = flag_flag::factory_by_content_type('node');
 
@@ -200,11 +214,11 @@ function flag_lists_form_submit($form, $form_state, $account = NULL) {
 /**
  * Flag lists settings page.
  */
-function flag_lists_settings_form(&$form_state) {
+function flag_lists_settings_form($form, $form_state) {
   drupal_set_title(t('Flag lists settings'));
   $form['text'] = array(
     '#title' => t('Using flag lists'),
-    '#value' => t('Flag lists allow users to create their own personal flags.
+    '#markup' => t('Flag lists allow users to create their own personal flags.
       No user can add to another user\'s lists. Lists inherit their
       settings from template flags, which exist as flags in the flags\' module.'
     ),
@@ -228,7 +242,7 @@ function flag_lists_settings_form(&$form_state) {
     '#tree' => FALSE,
   );
   $form['rebuild']['global_rebuild'] = array(
-    '#value' => l(t('Rebuild all flag lists.'), 'admin/build/flag_lists/rebuild'),
+    '#markup' => l(t('Rebuild all flag lists.'), FLAG_ADMIN_PATH . '/flag-lists/rebuild'),
   );
 
   return system_settings_form($form);
@@ -237,10 +251,10 @@ function flag_lists_settings_form(&$form_state) {
 /**
  * Confirm global settings rebuild.
  */
-function flag_lists_rebuild_confirm($form_state) {
+function flag_lists_rebuild_confirm($form, $form_state) {
   return confirm_form($form,
     t('Are you sure you want to rebuild all flag lists?'),
-    'admin/build/flags/lists/settings',
+    FLAG_ADMIN_PATH . '/lists/settings',
     t('This action cannot be undone.'),
     t('Rebuild'), t('Cancel')
   );
@@ -252,13 +266,13 @@ function flag_lists_rebuild_confirm($form_state) {
 function flag_lists_rebuild_confirm_submit($form, $form_state) {
   flag_lists_rebuild();
   drupal_set_message(t('All flag lists have been rebuilt.'));
-  drupal_goto('admin/build/flags/lists/settings');
+  drupal_goto(FLAG_ADMIN_PATH . '/lists/settings');
 }
 
 /**
  * Delete flag lists page.
  */
-function flag_lists_delete_confirm(&$form_state, $name) {
+function flag_lists_delete_confirm($form, $form_state, $name) {
   $flag = flag_lists_get_flag($name);
   if (empty($flag)) {
     drupal_goto();
@@ -284,7 +298,7 @@ function flag_lists_delete_confirm_submit($form, &$form_state) {
 /**
  * Form to create a new template.
  */
-function flag_lists_create_template_form(&$form_state) {
+function flag_lists_create_template_form($form, $form_state) {
   drupal_set_title(t('Add a new list template'));
   $form['help'] = array(
     '#value' => t('This form creates a new, blank list template. After saving, you will be able to configure further options.'),
@@ -331,8 +345,12 @@ function flag_lists_create_template_form_submit($form, &$form_state) {
   $flag->title = t('List template') . ' ' . $form_state['values']['name'];
   $flag->save();
   // Enter the new template into flag_lists_types.
-  db_query("INSERT INTO {flag_lists_types} (name) VALUES ('%s')", $flag->name);
-  $form_state['redirect'] = 'admin/build/flags/edit/' . $flag->name;
+  db_insert('flag_lists_types')
+    ->fields(array(
+      'name' => $flag->name,
+    ))
+    ->execute();
+  $form_state['redirect'] = FLAG_ADMIN_PATH . '/edit/' . $flag->name;
 }
 
 
@@ -414,11 +432,16 @@ function flag_lists_generate_lists_form_submit($form, &$form_state) {
   if ($form_state['values']['kill_listings']) {
       $flags = flag_lists_get_flags();
     foreach ($flags as $flag) {
-      $result = db_query("SELECT fcid, content_id from {flag_lists_content} WHERE fid = %d", $flag->fid);
-      while ($row = db_fetch_array($result)) {
-        db_query("DELETE FROM {flag_lists_content} WHERE fid = %d", $flag->fid);
-        db_query("DELETE FROM {flag_lists_counts} WHERE fid = %d", $flag->fid);
-        module_invoke_all('flag', 'unflag', $flag, $row['content_id'], $account, $row['fcid']);
+      $result = db_select('flag_lists_content', 'f')
+        ->fields('f', array('fcid', 'content_id'))
+        ->condition('fid', $flag->fid)
+        ->execute();
+
+      foreach ($result as $row) {
+        db_delete('flag_lists_content')->condition('fid', $flag->fid)->execute();
+        db_delete('flag_lists_counts')->condition('fid', $flag->fid)->execute();
+
+        module_invoke_all('flag', 'unflag', $flag, $row->content_id, $account, $row->fcid);
       }
     }
     drupal_set_message(t('All listings were deleted.'));
@@ -479,7 +502,10 @@ function flag_lists_generate_lists_form_submit($form, &$form_state) {
 
       // We get the random nid with 2 SELECTS to avoid slow ORDER BY Rand().
       // Get max nid for our content type.
-      $max_nid = db_result(db_query("SELECT MAX(nid) as max FROM {node} WHERE type = '%s'", $content_type));
+      $query = db_select('node')
+        ->condition('type', $content_type);
+      $query->addExpression('MAX(nid)', 'max');
+      $max_nid = $query->execute()->fetchField();
 
       // Ensure a node exists for the type.
       if (!$max_nid) {

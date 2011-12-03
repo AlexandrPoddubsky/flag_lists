@@ -312,5 +312,6 @@ function flag_lists_views_data() {
       ),
     ),
   );
+  dpm($data);
   return $data;
 }
