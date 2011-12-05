@@ -112,7 +112,7 @@ function flag_lists_menu() {
   );
 
   $items['user/%user/flags/lists'] = array(
-    'title' => 'Lists',
+    'title' => ucfirst(variable_get('flag_lists_name', 'list')),
     'page callback' => 'flag_lists_user_page',
     'page arguments' => array(1),
     'access callback' => 'user_access',
@@ -120,7 +120,7 @@ function flag_lists_menu() {
     'type' => MENU_LOCAL_TASK,
   );
   $items['user/%user/flags/lists/%'] = array(
-    'title' => 'Listed content',
+    'title' => ucfirst(variable_get('flag_lists_name', 'list')) . ' content',
     'page callback' => 'flag_lists_user_list',
     'page arguments' => array(1, 4),
     'access callback' => 'user_access',
