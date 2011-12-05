@@ -111,7 +111,7 @@ function flag_lists_menu() {
     'type' => MENU_CALLBACK,
   );
 
-  $items['user/%/flags/lists'] = array(
+  $items['user/%user/flags/lists'] = array(
     'title' => 'Lists',
     'page callback' => 'flag_lists_user_page',
     'page arguments' => array(1),
@@ -119,7 +119,7 @@ function flag_lists_menu() {
     'access arguments' => array('view flag lists'),
     'type' => MENU_LOCAL_TASK,
   );
-  $items['user/%/flags/lists/%'] = array(
+  $items['user/%user/flags/lists/%'] = array(
     'title' => 'Listed content',
     'page callback' => 'flag_lists_user_list',
     'page arguments' => array(1, 4),
@@ -133,20 +133,20 @@ function flag_lists_menu() {
 /**
  * User flag page. Display a list of user-created flag lists.
  */
-function flag_lists_user_page($uid) {
+function flag_lists_user_page($user) {
     // Can we use our default view?
   if (module_exists('views')) {
     $view = views_get_view('flag_lists_user_lists', FALSE);
     if (!empty($view)) {
       $view->set_display('default');
-      $view->set_arguments(array($uid));
+      $view->set_arguments(array($user->uid));
       $output = $view->render();
-      drupal_set_title($view->build_info['title']);
+      drupal_set_title(str_replace(array_keys($view->build_info['substitutions']), $view->build_info['substitutions'], $view->build_info['title']));
     }
     return $output;
   }
   else {
-    return theme('flag_lists_user_page', array('uid' => $uid));
+    return theme('flag_lists_user_page', array('uid' => $user->uid));
   }
 }
 
@@ -154,7 +154,7 @@ function flag_lists_user_page($uid) {
  * Theme the output for a user flag administration page.
  */
 function theme_flag_lists_user_page($variables) {
-  $uid = variables('uid');
+  $uid = $variables['uid'];
 
   $account = user_load($uid);
   drupal_set_title(t('Lists'));
@@ -172,7 +172,8 @@ function theme_flag_lists_user_page($variables) {
 /**
  * List the contents of a user-defined list
  */
-function flag_lists_user_list($uid, $fid) {
+function flag_lists_user_list($user, $fid) {
+  $uid = $user->uid;
     // Can we use our default view?
   if (module_exists('views')) {
     $view = views_get_view('flag_lists_user_list', FALSE);
@@ -180,7 +181,7 @@ function flag_lists_user_list($uid, $fid) {
       $view->set_display('default');
       $view->set_arguments(array($fid));
       $output = $view->render();
-      drupal_set_title($view->build_info['title']);
+      drupal_set_title(str_replace(array_keys($view->build_info['substitutions']), $view->build_info['substitutions'], $view->build_info['title']));
     }
     return $output;
   }
