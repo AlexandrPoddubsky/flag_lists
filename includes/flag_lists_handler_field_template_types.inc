@@ -22,8 +22,13 @@ class flag_lists_handler_field_template_types extends views_handler_field_preren
     }
 
     if ($names) {
-      $result = db_query("SELECT flt.type, flt.name FROM {flag_lists_types} flt INNER JOIN {flags} f ON flt.name = f.name WHERE f.name IN ('" . implode('\', \'', $names) . "') ORDER BY flt.type");
-      while ($type = db_fetch_object($result)) {
+      $query = db_select('flag_lists_types', 'flt');
+      $query->innerJoin('flags', 'f', 'flt.name = f.name');
+      $result = $query->fields('flt', array('type', 'name'))
+        ->condition('f.name', $names, 'IN')
+        ->orderBy('flt.type')
+        ->execute();
+      foreach ($result as $type) {
         $this->items[$type->name][$type->type] = check_plain($type->type);
       }
     }

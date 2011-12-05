@@ -57,7 +57,7 @@ function flag_lists_menu() {
     'weight' => 3,
   );
   if (module_exists('devel_generate')) {
-    $items['admin/generate/flag_lists'] = array(
+    $items['admin/config/development/generate/flag-lists'] = array(
       'title' => 'Generate lists',
       'description' => 'Generate a given number of lists and listings on site content. Optionally delete existing lists and listings.',
       'page callback' => 'drupal_get_form',
@@ -67,10 +67,10 @@ function flag_lists_menu() {
       'file' => 'flag_lists.admin.inc',
     );
   }
-  $items['admin/build/flag_lists/add/%'] = array(
+  $items['flag-lists/add/%'] = array(
     'title' => 'Add a list',
     'page callback' => 'flag_lists_add',
-    'page arguments' => array(4),
+    'page arguments' => array(2),
     'access callback' => 'user_access',
     'access arguments' => array('create flag lists'),
     'file' => 'flag_lists.admin.inc',
@@ -300,13 +300,20 @@ function flag_lists_form_alter(&$form, &$form_state, $form_id) {
         $form['#submit'][] = 'flag_lists_template_submit';
       }
     break;
+
+    case 'views_exposed_form':
+      // Force the exposed filters to perform actions on the page itself because
+      // the views default viwe didn't come with a page display
+      if ($form['#id'] == 'views-exposed-form-flag-lists-default') {
+        $form['#action'] = '/' . implode('/', arg());
+      }
+    break;
   }
 }
 
 function flag_lists_template_validate($form, &$form_state) {
   $types = array_filter($form_state['values']['types']);
   $errors = array();
-  dpm($types, 'types');
   foreach ($types as $type) {
     $result = db_select('flag_lists_types', 'f')
       ->fields('f')
@@ -330,7 +337,7 @@ function flag_lists_template_submit($form, &$form_state) {
   // Clean out the old types, then add the new.
   $num_deleted = db_delete('flag_lists_types')
     ->condition('name', $form_state['values']['name'])
-    ->execute(); dpm($num_deleted, 'num_deleted'); dpm($types);
+    ->execute();
   foreach ($types as $type) {
     db_insert('flag_lists_types')
       ->fields(array(
@@ -507,7 +514,7 @@ function flag_lists_set_messages(&$flag) {
  * Make sure a user can only see his/her own personal flags.
  */
 function flag_lists_flag_access($flag, $content_id, $action, $account) {
-  if ($flag->module == 'flag_lists') {
+  if (!empty($flag->module) && $flag->module == 'flag_lists') {
   switch ($action) {
     case 'flag':
     case 'unflag':
@@ -738,10 +745,10 @@ function theme_flag_lists_list($variables) {
       // Do we need the ops?
       if ($ops && $flag->module == 'flag_lists') {
         $ops_links = theme('flag_lists_ops', array('flag' => $flag));
-        $link = $flag->theme($action, array('content_id' => $content_id)) . $ops_links;
+        $link = $flag->theme($action, $content_id) . $ops_links;
       }
       else {
-        $link = $flag->theme($action, array('content_id' => $content_id));
+        $link = $flag->theme($action, $content_id);
       }
 
       // If it's a list, fix the link.
@@ -752,7 +759,7 @@ function theme_flag_lists_list($variables) {
     }
   }
   if ($create && flag_lists_template_exists($content_type)) {
-    $items[] = l(t('Make a new @name', array('@name' => variable_get('flag_lists_name', t('list')))), 'admin/build/flag_lists/add/' . $content_type, array('query' => drupal_get_destination()));
+    $items[] = l(t('Make a new @name', array('@name' => variable_get('flag_lists_name', t('list')))), 'flag-lists/add/' . $content_type, array('query' => drupal_get_destination()));
   }
 
   // Return if nothing to display.
@@ -933,12 +940,12 @@ function flag_lists_flag_default_flags($name = 'fl_template') {
       // to the DB in English. They are passed to t() later, thus allowing for
       // multilingual sites.
       'title' => 'Flag lists template',
-      'flag_short' => 'Add to your [flag-lists-title] [flag-lists-term]',
-      'flag_long' => 'Add this post to your [flag-lists-title] [flag-lists-term]',
-      'flag_message' => 'This post has been added to your [flag-lists-title] [flag-lists-term]',
-      'unflag_short' => 'Remove this from your [flag-lists-title] [flag-lists-term]',
-      'unflag_long' => 'Remove this post from your [flag-lists-title] [flag-lists-term]',
-      'unflag_message' => 'This post has been removed from your [flag-lists-title] [flag-lists-term]',
+      'flag_short' => 'Add to your [flag_lists:title] [flag_lists:term]',
+      'flag_long' => 'Add this post to your [flag_lists:title] [flag_lists:term]',
+      'flag_message' => 'This post has been added to your [flag_lists:title] [flag_lists:term]',
+      'unflag_short' => 'Remove this from your [flag_lists:title] [flag_lists:term]',
+      'unflag_long' => 'Remove this post from your [flag_lists:title] [flag_lists:term]',
+      'unflag_message' => 'This post has been removed from your [flag_lists:title] [flag_lists:term]',
       'types' => array(),
       'link_type' => 'toggle',
     ),
@@ -977,7 +984,7 @@ function flag_lists_update($flag) {
       'name' => $flag->name,
       'options' => $flag->get_serialized_options($flag),
     ))
-    ->condition($flag->fid)
+    ->condition('fid', $flag->fid)
     ->execute();
 }
 
@@ -1043,7 +1050,7 @@ function flag_lists_page($action = NULL, $flag_name = NULL, $content_id = NULL) 
     $error = t('You must have JavaScript and cookies enabled in your browser to flag content.');
   }
   else {
-    if (!($flag = flag_lists_get_flag($flag_name))) {
+    if (empty($flag_name) || !($flag = flag_lists_get_flag($flag_name))) {
       // Flag does not exist.
       $error = t('You are not allowed to flag, or unflag, this content.');
     }
@@ -1079,7 +1086,7 @@ function flag_lists_page($action = NULL, $flag_name = NULL, $content_id = NULL) 
     $new_action = _flag_lists_is_flagged($flag, $content_id, $user->uid, $sid) ? 'unflag' : 'flag';
     $new_link = $flag->theme($new_action, $content_id, TRUE);
     flag_lists_fix_link($new_link, $new_action);
-    print drupal_to_js(array(
+    drupal_json_output(array(
       'status' => TRUE,
       'newLink' => $new_link,
       // Further information for the benefit of custom JavaScript event handlers:
@@ -1245,9 +1252,9 @@ function flag_lists_fix_link(&$link, $action) {
   function _flag_lists_update_count($flag, $content_id) {
     $count = db_select('flag_lists_content', 'f')
       ->fields('f')
-      ->countQuery()
       ->condition('fid', $flag->fid)
       ->condition('content_id', $content_id)
+      ->countQuery()
       ->execute()
       ->fetchField();
 
@@ -1318,29 +1325,50 @@ function flag_lists_get_templates() {
 
 
 /**
- * Implementation of hook_token_list().
+ * Implements hook_token_info().
  */
-function flag_lists_token_list($type = 'all') {
-  $tokens = array();
-  if ($type == 'node' || $type == 'all') {
-    $tokens['flag_lists']['flag-lists-term'] = t('The terminology used to name the lists, such as list, wishlist, favorites, etc.');
-    $tokens['flag_lists']['flag-lists-title'] = t('The title of the lis.');
-  }
-  return $tokens;
+function flag_lists_token_info() {
+  $type = array(
+    'name' => t('Flag lists'), 
+    'description' => t('Tokens related to flag lists.'), 
+    'needs-data' => 'flag_lists',
+  );
+
+  $flag_lists['term'] = array(
+    'name' => t("Term"), 
+    'description' => t("The terminology used to name the lists, such as list, wishlist, favorites, etc."),
+  );
+  $flag_lists['title'] = array(
+    'name' => t("Title"), 
+    'description' => t("The title of the list."),
+  );
+
+  return array(
+    'types' => array('flag_lists' => $type), 
+    'tokens' => array('flag_lists' => $flag_lists),
+  );
 }
 
 /**
- * Implementation of hook_token_values().
+ * Implements hook_tokens().
  */
-function flag_lists_token_values($type, $object = NULL) {
-  $values = array();
-  if ($type == 'flag_lists') {
-    $values['flag-lists-term'] = check_plain(variable_get('flag_lists_name', t('list')));
-    $values['flag-lists-title'] = check_plain($object->title);
+function flag_lists_tokens($type, $tokens, array $data = array(), array $options = array()) {
+  $replacements = array();
+  if ($type == 'flag_lists' && !empty($data['flag_lists'])) {
+    $flag_list = $data['flag_lists'];
+    foreach ($tokens as $name => $original) {
+      switch ($name) {
+        case 'title':
+          $replacements[$original] = $flag_list->title;
+          break;
+        case 'term':
+          $replacements[$original] = variable_get('flag_lists_name', t('list'));
+          break;
+      }
+    }
   }
-  return $values;
+  return $replacements;
 }
-
 
 /**
  * Preprocess link title and text for the flag.tpl.php
@@ -1348,7 +1376,7 @@ function flag_lists_token_values($type, $object = NULL) {
  * This seems to be the only place to do this
  */
 function flag_lists_preprocess_flag(&$variables) {
-  if (module_exists('token') && $variables['flag']->module == 'flag_lists') {
+  if (module_exists('token') && !empty($variables['flag']->module) && $variables['flag']->module == 'flag_lists') {
     if (!empty($variables['link_text'])) {
       $variables['link_text'] = token_replace($variables['link_text'], array('flag_lists' => $variables['flag']));
     }

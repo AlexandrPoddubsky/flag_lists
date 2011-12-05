@@ -45,7 +45,7 @@ function theme_flag_lists_admin_page($variables) {
       $ops = theme('flag_lists_ops', $flag);
 
       $name = db_select('users', 'u')
-        ->fields('u', 'name')
+        ->fields('u', array('name'))
         ->condition('uid', $flag->uid)
         ->execute()
         ->fetchField();
@@ -65,7 +65,7 @@ function theme_flag_lists_admin_page($variables) {
       );
     }
 
-    $output .= theme('table', $header, $rows);
+    $output .= theme('table', array('header' => $header, 'rows' => $rows));
     $output .= theme('pager', NULL, 25, 0);
   }
 
@@ -95,7 +95,7 @@ function flag_lists_form($form, $form_state, $name = NULL, $type = NULL) {
   // If name is numeric, then we have the fid, so get the name.
   if (is_numeric($name)) {
     $name = db_select('flag_lists_flags', 'f')
-      ->fields('f', 'name')
+      ->fields('f', array('name'))
       ->condition('fid', $name)
       ->execute()
       ->fetchField();

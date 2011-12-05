@@ -13,10 +13,11 @@ class flag_lists_handler_argument_fid extends views_handler_argument_numeric {
    */
   function title_query() {
     $titles = array();
-    $placeholders = implode(', ', array_fill(0, sizeof($this->value), '%d'));
-
-    $result = db_query("SELECT fl.title FROM {flag_lists_flags} fl WHERE fl.fid IN ($placeholders)", $this->value);
-    while ($term = db_fetch_object($result)) {
+    $result = db_select('flag_lists_flags', 'fl')
+      ->fields('fl', array('title'))
+      ->condition('fl.fid', $this->value, 'IN')
+      ->execute();
+    foreach ($result as $term) {
       $titles[] = check_plain($term->title);
     }
     return $titles;

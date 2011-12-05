@@ -182,16 +182,15 @@ function flag_lists_install() {
       'name' => 'fl_template',
     ))
     ->execute();
-
 }
 
 function flag_lists_uninstall() {
   // Remove our template flags.
   if (module_exists(flag)) {
-    $query = db_select('flag_lists_types', 'fl')
-      ->leftJoin('flags', 'f', 'fl.name = f.name')
-      ->distinct();
+    $query = db_select('flag_lists_types', 'fl');
+    $query->leftJoin('flags', 'f', 'fl.name = f.name');
     $query->addField('fl', 'fid', 'fid');
+    $query->distinct();
     $fids = $query->execute();
 
     foreach ($fids as $fid) {
