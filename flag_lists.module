@@ -717,7 +717,7 @@ function theme_flag_lists_list($variables) {
     $content_id = $node->nid;
   }
   // Or at least confirm we are on a node page and use has access.
-  elseif (arg(0) == 'node' && is_numeric(arg(1)) && is_null(arg(2)) && user_access('create flag lists')) {
+  elseif (arg(0) == 'node' && is_numeric(arg(1)) && user_access('create flag lists')) {
     $content_id = arg(1);
     $query = db_select('node')->condition('nid', $content_id);
     $query->addField('node', 'type');
