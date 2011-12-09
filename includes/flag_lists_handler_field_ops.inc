@@ -7,6 +7,7 @@ class flag_lists_handler_field_ops extends views_handler_field {
     $options['flo'] = array(
       'contains' => array(
         'force_single' => array('default' => FALSE),
+        'operation' => array('default' => 'flag'),
       ),
     );
 
@@ -27,6 +28,17 @@ class flag_lists_handler_field_ops extends views_handler_field {
       '#title' => t('Force single'),
       '#default_value' => $this->options['flo']['force_single'],
       '#description' => t('Check this box to restrict selection to a single value.'),
+    );
+    $form['flo']['operation'] = array(
+      '#type' => 'radios',
+      '#title' => t('Operation'),
+      '#default_value' => $this->options['flo']['operation'],
+      '#description' => t('The flag lists operation for this selection.'),
+      '#options' => array(
+        'flag' => 'Add to list',
+        'unflag' => 'Remove from list',
+      ),
+      '#required' => TRUE,
     );
   }
 

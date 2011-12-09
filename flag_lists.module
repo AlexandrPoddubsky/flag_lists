@@ -370,18 +370,34 @@ function flag_lists_ops_form($form, &$form_state, $flo) {
   }
 
   // Group items into a fieldset for easier theming.
+
+  switch ($flo->options['flo']['operation']) {
+    case 'unflag':
+      $null_text = 'Remove from a list';
+      $operation = 'unflag';
+      break;
+    default:
+      $null_text = 'Add to a list';
+      $operation = 'flag';
+      break;
+  }
+
   $form['flag_lists'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Add to a list'),
+    '#title' => t($null_text),
     '#tree' => TRUE,
   );
   $form['flag_lists']['list'] = array(
     '#type' => 'select',
-    '#options' => array('0' => t('- Add to a list -')) + $items,
+    '#options' => array('0' => t('- ' . $null_text . ' -')) + $items,
     '#ajax' => array(
      'callback' => 'flag_lists_ops_form_ajax_callback',
      'wrapper' => 'flag_lists_ops_status_message',
     ),
+  );
+  $form['flag_lists']['operation'] = array(
+    '#type' => 'hidden',
+    '#value' => $operation,
   );
   $form['flag_lists']['go'] = array(
     '#type' => 'submit',
@@ -444,16 +460,28 @@ function flag_lists_ops_form_submit(&$form, &$form_state) {
   // Get the $ops from the originating form.
   $ops = $_REQUEST['flag_lists_ops'];
 
+  // Get the operation, or set it
+  switch ($form_state['values']['flag_lists']['operation']) {
+    case 'unflag':
+      $operation = 'unflag';
+      $message = 'removed from';
+      break;
+    default:
+      $operation = 'flag';
+      $message = 'added to';
+      break;
+  }
+
   // Load that list
   if ($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list'])) {
     $success_count = 0;
     foreach ($ops as $content_id) {
-      if (flag_lists_do_flag($flag, 'flag', $content_id)) {
+      if (flag_lists_do_flag($flag, $operation, $content_id)) {
         $success_count++;
       }
     }
 
-    $message = t('@count item(s) added to !title', array('@count' => $success_count, '!title' => $flag->title));
+    $message = t('@count item(s) ' . $message . ' !title', array('@count' => $success_count, '!title' => $flag->title));
     if ($_GET['q'] != 'system/ajax') {
       drupal_set_message();
     }
