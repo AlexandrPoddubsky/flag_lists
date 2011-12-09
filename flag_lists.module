@@ -378,31 +378,66 @@ function flag_lists_ops_form($form, &$form_state, $flo) {
   $form['flag_lists']['list'] = array(
     '#type' => 'select',
     '#options' => array('0' => t('- Add to a list -')) + $items,
+    '#ajax' => array(
+     'callback' => 'flag_lists_ops_form_ajax_callback',
+     'wrapper' => 'flag_lists_ops_status_message',
+    ),
   );
   $form['flag_lists']['go'] = array(
     '#type' => 'submit',
     '#value' => t('Go'),
+    '#attributes' => array(
+      'class' => array('flag-lists-ops-go'),
+    ),
+  );
+  unset($form['actions']['submit']);
+
+  // Generate a status message for AJAX submission.
+  $form['flag_lists']['status_message'] = array(
+    '#markup' => '',
+    '#prefix' => '<div id="flag_lists_ops_status_message">',
+    '#suffix' => '</div>',
   );
 
   return $form;
 }
 
+function flag_lists_ops_form_ajax_callback($form, $form_state) {
+  // The form has already been submitted and updated. We can return the replaced
+  // item as it is.
+  if (!flag_lists_ops_form_validate($form, $form_state)) {
+    $message = flag_lists_ops_form_submit($form, $form_state);
+  }
+
+  $form['flag_lists']['status_message']['#markup'] = '<div class="message">' . $message . '</div>';
+
+  return $form['flag_lists']['status_message'];
+}
+
 function flag_lists_ops_form_validate(&$form, &$form_state) {
   global $user;
 
+  $error_count = 0;
+
   if (empty($form_state['values']['flag_lists']['list'])) {
     form_set_error('flag_lists][list', t('No list selected. Please select a list to add to.'));
+    $error_count++;
   }
   else if (!($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list']))) {
     form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
+    $error_count++;
   }
   else if ($flag->uid != $user->uid) {
     form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
+    $error_count++;
   }
 
   if (!isset($_REQUEST['flag_lists_ops']) || empty($_REQUEST['flag_lists_ops'])) {
     form_set_error('', t('No content selected.'));
+    $error_count++;
   }
+
+  return $error_count;
 }
 
 function flag_lists_ops_form_submit(&$form, &$form_state) {
@@ -418,7 +453,13 @@ function flag_lists_ops_form_submit(&$form, &$form_state) {
       }
     }
 
-    drupal_set_message(t('@count item(s) added to !title', array('@count' => $success_count, '!title' => $flag->title)));
+    $message = t('@count item(s) added to !title', array('@count' => $success_count, '!title' => $flag->title));
+    if ($_GET['q'] != 'system/ajax') {
+      drupal_set_message();
+    }
+    else {
+      return $message;
+    }
   }
 }
 
