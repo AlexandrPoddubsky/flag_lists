@@ -102,6 +102,22 @@ function flag_lists_views_data_alter(&$data) {
       ),
     ),
   );
+
+  // Add the checkbox for flagging nodes VBO style, minus batch API
+  foreach (entity_get_info() as $entity_type => $info) {
+    if (isset($info['base table']) && $info['base table'] == 'node' && isset($data[$info['base table']])) {
+      $data[$info['base table']]['flag_lists_ops'] = array(
+        'title' => t('Flag lists operations'),
+        'help' => t('Provide a checkbox to select the row for flag lists operations.'),
+        'real field' => $info['entity keys']['id'],
+        'field' => array(
+          'handler' => 'flag_lists_handler_field_ops',
+          'click sortable' => FALSE,
+        ),
+      );
+      break;
+    }
+  }
 }
 
 /**

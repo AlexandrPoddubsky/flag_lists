@@ -310,6 +310,133 @@ function flag_lists_form_alter(&$form, &$form_state, $form_id) {
       }
     break;
   }
+
+  // Flag lists operations related changes
+  if (strpos($form_id, 'views_form_') === 0) {
+    $flo = _flag_lists_ops_get_field($form_state['build_info']['args'][0]);
+
+    // Not a FLO-enabled views form.
+    if (empty($flo)) {
+      return;
+    }
+
+    // Add FLO's custom callbacks.
+    $form['#validate'][] = 'flag_lists_ops_form_validate';
+    $form['#submit'][] = 'flag_lists_ops_form_submit';
+
+    // Allow FLO to work when embedded using views_embed_view(), or in a block.
+    if (empty($flo->view->override_path)) {
+      if (!empty($flo->view->preview) || $flo->view->display_handler instanceof views_plugin_display_block) {
+        $flo->view->override_path = $_GET['q'];
+      }
+    }
+
+    // Quickfix for FLO & exposed filters using ajax. See http://drupal.org/node/1191928.
+    $query = drupal_get_query_parameters($_GET, array('q'));
+    $form['#action'] = url($flo->view->get_url(), array('query' => $query));
+
+    // Add basic FLO functionality.
+    if ($form_state['step'] == 'views_form_views_form') {
+      $form = flag_lists_ops_form($form, $form_state, $flo);
+    }
+  }
+}
+
+/**
+ * Add the Flag list select menu widget.
+ */
+function flag_lists_ops_form($form, &$form_state, $flo) {
+  $form['#attached']['js'][] = drupal_get_path('module', 'flag_lists') . '/js/flag_lists_ops.js';
+  $form['#attached']['css'][] = drupal_get_path('module', 'flag_lists') . '/css/flag_lists_ops.css';
+  $form['#prefix'] = '<div class="flo-views-form">';
+  $form['#suffix'] = '</div>';
+
+  // Force browser to reload the page if Back is hit.
+  if (preg_match('/msie/i', $_SERVER['HTTP_USER_AGENT'])) {
+    drupal_add_http_header('Cache-Control', 'no-cache'); // works for IE6+
+  }
+  else {
+    drupal_add_http_header('Cache-Control', 'no-store'); // works for Firefox and other browsers
+  }
+
+  global $user;
+  $account = user_load($user->uid);
+  $items = array();
+  if ($flags = flag_lists_get_user_flags(NULL, $account)) {
+    // Build the list of flag lists for this node.
+    foreach ($flags as $flag) {
+      $items[((string)$flag->fid)] = $flag->title;
+    }
+  }
+
+  // Group items into a fieldset for easier theming.
+  $form['flag_lists'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Add to a list'),
+    '#tree' => TRUE,
+  );
+  $form['flag_lists']['list'] = array(
+    '#type' => 'select',
+    '#options' => array('0' => t('- Add to a list -')) + $items,
+  );
+  $form['flag_lists']['go'] = array(
+    '#type' => 'submit',
+    '#value' => t('Go'),
+  );
+
+  return $form;
+}
+
+function flag_lists_ops_form_validate(&$form, &$form_state) {
+  global $user;
+
+  if (empty($form_state['values']['flag_lists']['list'])) {
+    form_set_error('flag_lists][list', t('No list selected. Please select a list to add to.'));
+  }
+  else if (!($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list']))) {
+    form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
+  }
+  else if ($flag->uid != $user->uid) {
+    form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
+  }
+
+  if (!isset($_REQUEST['flag_lists_ops']) || empty($_REQUEST['flag_lists_ops'])) {
+    form_set_error('', t('No content selected.'));
+  }
+}
+
+function flag_lists_ops_form_submit(&$form, &$form_state) {
+  // Get the $ops from the originating form.
+  $ops = $_REQUEST['flag_lists_ops'];
+
+  // Load that list
+  if ($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list'])) {
+    $success_count = 0;
+    foreach ($ops as $content_id) {
+      if (flag_lists_do_flag($flag, 'flag', $content_id)) {
+        $success_count++;
+      }
+    }
+
+    drupal_set_message(t('@count item(s) added to !title', array('@count' => $success_count, '!title' => $flag->title)));
+  }
+}
+
+/**
+ * Gets the FLO field if it exists on the passed-in view.
+ *
+ * @return
+ *  The field object if found. Otherwise, FALSE.
+ */
+function _flag_lists_ops_get_field($view) {
+  foreach ($view->field as $field_name => $field) {
+    if ($field instanceof flag_lists_handler_field_ops) {
+      // Add in the view object for convenience.
+      $field->view = $view;
+      return $field;
+    }
+  }
+  return FALSE;
 }
 
 function flag_lists_template_validate($form, &$form_state) {
@@ -1388,4 +1515,21 @@ function flag_lists_preprocess_flag(&$variables) {
       $variables['message_text'] = token_replace($variables['message_text'], array('flag_lists' => $variables['flag']));
     }
   }
+}
+
+/**
+ * Implements hook_views_form_substitutions().
+ */
+function flag_lists_views_form_substitutions() {
+  // Views check_plains the column label, so Flag lists needs to do the same
+  // in order for the replace operation to succeed.
+  $select_all_placeholder = check_plain('<!--flag-lists-ops-select-all-->');
+  $select_all = array(
+    '#type' => 'checkbox',
+    '#default_value' => FALSE,
+    '#attributes' => array('class' => array('flo-table-select-all')),
+  );
+  return array(
+    $select_all_placeholder => drupal_render($select_all),
+  );
 }
