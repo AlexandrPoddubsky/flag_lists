@@ -676,7 +676,7 @@ function flag_lists_block_view($delta = '') {
       }
       break;
   }
-  return (!is_null($block['content'])) ? $block : array();
+  return (!empty($block['content'])) ? $block : array();
 }
 
 /**
