@@ -148,7 +148,7 @@ function flag_lists_views_data() {
     ),
     'fid' => array(
       'title' => t('fid'),
-      'help' => t('Flag list id'),
+      'help' => t('Flag list id, required for Flag lists operationis\'s "unflag" action.'),
       'field' => array(
         'handler' => 'flag_lists_handler_field_list',
         'click sortable' => TRUE,

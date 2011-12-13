@@ -84,7 +84,7 @@ class flag_lists_handler_field_ops extends views_handler_field {
       else {
         $form[$this->options['id']][$row_index] = array(
           '#type' => 'checkbox',
-          '#return_value' => $entity_id,
+          '#return_value' => $entity_id . (isset($row->flag_lists_flags_fid) ? ('-' . $row->flag_lists_flags_fid) : ''),
           '#default_value' => FALSE,
           '#attributes' => array('class' => array('flo-select')),
         );

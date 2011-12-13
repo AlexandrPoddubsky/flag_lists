@@ -370,31 +370,52 @@ function flag_lists_ops_form($form, &$form_state, $flo) {
   }
 
   // Group items into a fieldset for easier theming.
-
+  $form['flag_lists'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('List operations'),
+    '#tree' => TRUE,
+  );
   switch ($flo->options['flo']['operation']) {
     case 'unflag':
       $null_text = 'Remove from a list';
       $operation = 'unflag';
+      $form['flag_lists']['list'] = array(
+        '#type' => 'button',
+        '#value' => t('Remove from list'),
+        '#ajax' => array(
+          'callback' => 'flag_lists_ops_form_ajax_callback',
+          'wrapper' => 'flag_lists_ops_status_message',
+        ),
+      );
       break;
     default:
       $null_text = 'Add to a list';
       $operation = 'flag';
+      $form['flag_lists']['list'] = array(
+        '#type' => 'select',
+        '#options' => array('0' => t('- ' . $null_text . ' -')) + $items,
+        '#ajax' => array(
+         'callback' => 'flag_lists_ops_form_ajax_callback',
+         'wrapper' => 'flag_lists_ops_status_message',
+        ),
+      );
       break;
   }
 
-  $form['flag_lists'] = array(
-    '#type' => 'fieldset',
-    '#title' => t($null_text),
-    '#tree' => TRUE,
-  );
-  $form['flag_lists']['list'] = array(
-    '#type' => 'select',
-    '#options' => array('0' => t('- ' . $null_text . ' -')) + $items,
-    '#ajax' => array(
-     'callback' => 'flag_lists_ops_form_ajax_callback',
-     'wrapper' => 'flag_lists_ops_status_message',
-    ),
-  );
+  // Get the $ops from the originating form.
+  if (!empty($form_state['values']['flag_lists']['list'])) {
+    $list = $form_state['values']['flag_lists']['list'];
+  }
+  if (!empty($_REQUEST['flag_lists_ops'])) {
+    $ops = $_REQUEST['flag_lists_ops'];
+  }
+  if (!empty($ops) && !empty($list) && $form_state['values']['flag_lists']['operation'] == 'unflag') {
+    $hidden_deleted_values = '';
+    foreach ($ops as $nid) {
+      $hidden_deleted_values .= '<input type="hidden" class="flo-deleted-value" value="' . $nid . '" />';
+    } 
+  }
+
   $form['flag_lists']['operation'] = array(
     '#type' => 'hidden',
     '#value' => $operation,
@@ -411,8 +432,8 @@ function flag_lists_ops_form($form, &$form_state, $flo) {
   // Generate a status message for AJAX submission.
   $form['flag_lists']['status_message'] = array(
     '#markup' => '',
-    '#prefix' => '<div id="flag_lists_ops_status_message">',
-    '#suffix' => '</div>',
+    '#prefix' => '<div id="flag_lists_ops_status_message" class="flag-lists-ops-status-message">',
+    '#suffix' => (!empty($hidden_deleted_values)) ? $hidden_deleted_values : '' . '</div>',
   );
 
   return $form;
@@ -435,22 +456,42 @@ function flag_lists_ops_form_validate(&$form, &$form_state) {
 
   $error_count = 0;
 
-  if (empty($form_state['values']['flag_lists']['list'])) {
-    form_set_error('flag_lists][list', t('No list selected. Please select a list to add to.'));
-    $error_count++;
-  }
-  else if (!($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list']))) {
-    form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
-    $error_count++;
-  }
-  else if ($flag->uid != $user->uid) {
-    form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
-    $error_count++;
-  }
-
+  // Check to see if an items are selected, if not fail right away.
   if (!isset($_REQUEST['flag_lists_ops']) || empty($_REQUEST['flag_lists_ops'])) {
     form_set_error('', t('No content selected.'));
     $error_count++;
+    return $error_count;
+  }
+
+  switch ($form_state['values']['flag_lists']['operation']) {
+    case 'unflag':
+      $ops = $_REQUEST['flag_lists_ops'];
+      foreach ($ops as $key => $op) {
+        $ops[$key] = explode('-', $op);
+        if (empty($ops[$key][1]) || !($flag = flag_lists_get_flag($ops[$key][1]))) {
+          form_set_error('flag_lists][remove', t('Invalid options list selected to remove from.'));
+          $error_count++;
+        }
+        else if ($flag->uid != $user->uid) {
+          form_set_error('flag_lists][remove', t('You are only allowed to remove content from your own lists.'));
+          $error_count++;
+        }
+      }
+      break;
+    default:
+      if (empty($form_state['values']['flag_lists']['list'])) {
+        form_set_error('flag_lists][list', t('No list selected. Please select a list to add to.'));
+        $error_count++;
+      }
+      else if (!($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list']))) {
+        form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
+        $error_count++;
+      }
+      else if ($flag->uid != $user->uid) {
+        form_set_error('flag_lists][list', t('Invalid list selected. Please select a list to add to.'));
+        $error_count++;
+      }
+      break;
   }
 
   return $error_count;
@@ -459,35 +500,46 @@ function flag_lists_ops_form_validate(&$form, &$form_state) {
 function flag_lists_ops_form_submit(&$form, &$form_state) {
   // Get the $ops from the originating form.
   $ops = $_REQUEST['flag_lists_ops'];
+  $success_count = 0;
 
   // Get the operation, or set it
   switch ($form_state['values']['flag_lists']['operation']) {
     case 'unflag':
       $operation = 'unflag';
       $message = 'removed from';
+
+      foreach ($ops as $op) {
+        // Process the ID into 2 parts
+        list($nid, $fid) = explode('-', $op);
+        if (empty($nid) || empty($fid)) return;
+
+        if (($flag = flag_lists_get_flag($fid)) && ($node = node_load($nid))) {
+          if (flag_lists_do_flag($flag, $operation, $nid)) {
+            $success_count++;
+          }
+        }
+      }
       break;
     default:
       $operation = 'flag';
       $message = 'added to';
+
+      if ($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list'])) {
+        foreach ($ops as $nid) {
+          if (flag_lists_do_flag($flag, $operation, $nid)) {
+            $success_count++;
+          }
+        }
+      }
       break;
   }
 
-  // Load that list
-  if ($flag = flag_lists_get_flag($form_state['values']['flag_lists']['list'])) {
-    $success_count = 0;
-    foreach ($ops as $content_id) {
-      if (flag_lists_do_flag($flag, $operation, $content_id)) {
-        $success_count++;
-      }
-    }
-
-    $message = t('@count item(s) ' . $message . ' !title', array('@count' => $success_count, '!title' => $flag->title));
-    if ($_GET['q'] != 'system/ajax') {
-      drupal_set_message();
-    }
-    else {
-      return $message;
-    }
+  $message = t('@count item(s) ' . $message . ' !title', array('@count' => $success_count, '!title' => $flag->title));
+  if ($_GET['q'] != 'system/ajax') {
+    drupal_set_message();
+  }
+  else {
+    return $message;
   }
 }
 
