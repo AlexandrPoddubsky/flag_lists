@@ -1264,9 +1264,9 @@ function flag_lists_fl_delete($flag, $account = NULL) {
     $account = $GLOBALS['user'];
   }
 
-  db_delete('flag_lists_counts')->condition('fid', $flag->fid);
-  db_delete('flag_lists_content')->condition('fid', $flag->fid);
-  db_delete('flag_lists_flags')->condition('fid', $flag->fid);
+  db_delete('flag_lists_counts')->condition('fid', $flag->fid)->execute();
+  db_delete('flag_lists_content')->condition('fid', $flag->fid)->execute();
+  db_delete('flag_lists_flags')->condition('fid', $flag->fid)->execute();
 
   $flag->is_deleted = TRUE;
   module_invoke_all('flag_lists', $flag, $account);
