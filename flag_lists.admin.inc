@@ -81,6 +81,66 @@ function flag_lists_add($type = NULL) {
 }
 
 /**
+ * Callback for adding new lists through AJAX.
+ */
+function flag_lists_add_js($type = NULL) {
+  if (is_null($type)) {
+    drupal_json_output(array('error' => t('Type not supplied.')));
+    exit();
+  }
+
+  $name = check_plain($_REQUEST['name']);
+  if (!isset($name) || empty($name)) {
+    drupal_json_output(array('error' => t('List name not supplied.')));
+    exit();
+  }
+
+  if (drupal_strlen($name) > 255) {
+    drupal_json_output(array('error' => t('List name is too long. Maximum is 255 characters.')));
+    exit();
+  }
+
+  if (flag_lists_title_exists($name, $type)) {
+    drupal_json_output(array('error' => t('You already have a @name with this name for this type of content.', array('@name' => variable_get('flag_lists_name', t('list'))))));
+    exit();
+  }
+
+  if (!isset($account)) {
+    $account = $GLOBALS['user'];
+  }
+
+  // New flag. Load the template row.
+  $query = db_select('flags', 'f');
+  $query->leftJoin('flag_lists_types', 'fl', 'f.name = fl.name');
+  $query->fields('f')
+    ->fields('fl')
+    ->condition('fl.type', $type);
+  
+  $row = $query->execute()
+    ->fetchObject();
+
+  $newflag = flag_flag::factory_by_content_type('node');
+
+  $flag = $newflag->factory_by_row($row);
+  // The template fid becomes the flag_lists parent flag.
+  $flag->pfid = $row->fid;
+  // The fid is NULL because this is really a new flag.
+  $flag->fid = NULL;
+  // The name is created in the save function.
+  $flag->name = NULL;
+  $flag->link_type = 'toggle';
+  $flag->title = $name;
+  $flag->types = array($type);
+  $flag->uid = $account->uid;
+  flag_lists_set_messages($flag);
+
+  // Save it.
+  flag_lists_save($flag, $account);
+
+  drupal_json_output(array('error' => '', 'flag' => $flag));
+}
+
+/**
  * Form to Add or edit a list.
  */
 function flag_lists_form($form, $form_state, $name = NULL, $type = NULL) {
@@ -154,7 +214,7 @@ function flag_lists_form($form, $form_state, $name = NULL, $type = NULL) {
 function flag_lists_form_validate($form, $form_state) {
   // Ensure 255 charactor or less name.
   if (drupal_strlen($form_state['values']['title']) > 255) {
-    form_set_error('name', t('The @name title may only be 32 characters long.', array('@name' => variable_get('flag_lists_name', t('list')))));
+    form_set_error('name', t('The @name title may only be 255 characters long.', array('@name' => variable_get('flag_lists_name', t('list')))));
   }
   // Ensure the machine name is unique.
   if (!$form_state['values']['edit']) {
@@ -172,7 +232,7 @@ function flag_lists_form_submit($form, $form_state, $account = NULL) {
     $account = $GLOBALS['user'];
   }
 
-  if ($form_state['values']['edit']) {
+  if (!empty($form_state['values']['edit'])) {
     // Editing the title.
     $flag = flag_lists_get_flag($form_state['values']['name']);
     $flag->title = $form_state['values']['title'];
@@ -202,7 +262,7 @@ function flag_lists_form_submit($form, $form_state, $account = NULL) {
     // The name is created in the save function.
     $flag->name = NULL;
     $flag->link_type = 'toggle';
-    $flag->title = $form_state['values']['title'];;
+    $flag->title = $form_state['values']['title'];
     $flag->types = array($type);
     $flag->uid = $account->uid;
     flag_lists_set_messages($flag);
@@ -535,3 +595,5 @@ function flag_lists_generate_lists_form_submit($form, &$form_state) {
   }
   }
 }
+
+

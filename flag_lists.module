@@ -76,6 +76,17 @@ function flag_lists_menu() {
     'file' => 'flag_lists.admin.inc',
     'type' => MENU_NORMAL_ITEM,
   );
+  // Callback for adding a new list through JS
+  $items['flag-lists/add/%/js'] = array(
+    'title' => 'Add a list',
+    'page callback' => 'flag_lists_add_js',
+    'page arguments' => array(2),
+    'access callback' => 'user_access',
+    'access arguments' => array('create flag lists'),
+    'file' => 'flag_lists.admin.inc',
+    'type' => MENU_CALLBACK,
+  );
+
   $items['flags/lists/edit/%'] = array(
     'title' => 'Edit a list',
     'page callback' => 'drupal_get_form',
@@ -187,8 +198,8 @@ function flag_lists_user_list($user, $fid) {
   }
 
   else {
-  return theme('flag_lists_user_list', array('uid' => $uid, 'fid' => $fid));
-}
+    return theme('flag_lists_user_list', array('uid' => $uid, 'fid' => $fid));
+  }
 }
 
 /**
@@ -360,6 +371,7 @@ function flag_lists_ops_form($form, &$form_state, $flo) {
   }
 
   global $user;
+  global $base_url;
   $account = user_load($user->uid);
   $items = array();
   if ($flags = flag_lists_get_user_flags(NULL, $account)) {
@@ -391,6 +403,7 @@ function flag_lists_ops_form($form, &$form_state, $flo) {
     default:
       $null_text = 'Add to a list';
       $operation = 'flag';
+      drupal_add_library('system', 'ui.dialog');
       $form['flag_lists']['list'] = array(
         '#type' => 'select',
         '#options' => array('0' => t('- ' . $null_text . ' -')) + $items,
@@ -398,7 +411,24 @@ function flag_lists_ops_form($form, &$form_state, $flo) {
          'callback' => 'flag_lists_ops_form_ajax_callback',
          'wrapper' => 'flag_lists_ops_status_message',
         ),
+        '#attributes' => array(
+          'class' => array(
+            'flag-lists-ops-dropdown',
+          ),
+        ),
       );
+
+      // Add the necessary JS for creating a new list via AJAX
+      $result = db_select('flag_lists_types')
+        ->fields('flag_lists_types')
+        ->execute();
+      $list_types = array();
+      foreach ($result as $row) {
+        if (!empty($row->type)) {
+          $list_types[] = $row->type;
+        }
+      }
+      drupal_add_js(array('flag_lists' => array('types' => $list_types, 'json_path' => $base_url . '/flag-lists/add/%/js')), 'setting');
       break;
   }
 
@@ -536,7 +566,7 @@ function flag_lists_ops_form_submit(&$form, &$form_state) {
 
   $message = t('@count item(s) ' . $message . ' !title', array('@count' => $success_count, '!title' => $flag->title));
   if ($_GET['q'] != 'system/ajax') {
-    drupal_set_message();
+    drupal_set_message($message);
   }
   else {
     return $message;
